@@ -87,7 +87,7 @@ Now, the hardware is ready and the hyperterminal is connected to the UART output
 
 This section describes how to build the software environment for the contest. To build any other application available in the **sw/app** folder, replace **mnist** with the name of the application folder : **fft**, **helloworld**, **coremark**...
 
-The executables of MNIST & CoreMark applications are already available in **sw/app**, but can be recompiled. These two are test apps to make sure nothing is broken. But they are not the app we are interested in speeding up.
+**mnist** & **coremark** are usied to make sure nothing is broken. But they are not the app we are interested in speeding up.
 
 **The "fft" app is the only one we are interested in for the contest.**
 
@@ -129,13 +129,13 @@ drwxrwxr-x  5 user user 4096 Nov 23 10:57 bsp/
 drwxrwxr-x  2 user user 4096 Nov 23 10:57 utils/
 ```
 
-3. To compile mnist application, run the following commands.
+3. To compile fft application, run the following commands.
 ```
 user@[CONTAINER ID]:/workdir$ cd app
-user@[CONTAINER ID]:/workdir/app$ make mnist
+user@[CONTAINER ID]:/workdir/app$ make fft
 
 ```
-At the end of the compilation the mnist.riscv executable file must be created.
+At the end of the compilation the fft.riscv executable file must be created.
 
 4. Then, in the Docker container, launch **OpenOCD** in background:
 ```
@@ -160,7 +160,7 @@ Info : Listening on port 4444 for telnet connections
 
 5. In the Docker container (same terminal), launch **gdb** as following:
 ```
-user@[CONTAINER ID]:/workdir/app$ riscv-none-elf-gdb -ex 'target extended-remote :3333' mnist.riscv
+user@[CONTAINER ID]:/workdir/app$ riscv-none-elf-gdb -ex 'target extended-remote :3333' fft.riscv
 GNU gdb (GDB) 14.0.50.20230114-git
 Copyright (C) 2022 Free Software Foundation, Inc.
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
@@ -176,26 +176,28 @@ Find the GDB manual and other documentation resources online at:
 
 For help, type "help".
 Type "apropos word" to search for commands related to "word"...
-Reading symbols from mnist.riscv...
+Reading symbols from fft.riscv...
+Remote debugging using :3333
+Info : accepting 'gdb' connection on tcp/3333
 (gdb)
 ```
 
-6. In **gdb**, load **mnist.riscv** to CV32A6 FPGA platform by the load command:
+6. In **gdb**, load **fft.riscv** to CV32A6 FPGA platform by the load command:
 ```
 (gdb) load
 Loading section .vectors, size 0x80 lma 0x80000000
-Loading section .init, size 0x60 lma 0x80000080
-Loading section .text, size 0xe518 lma 0x800000e0
-Loading section .rodata, size 0x11c2c lma 0x8000e5f8
-Loading section .eh_frame, size 0x3c lma 0x80020224
-Loading section .data, size 0x91c lma 0x80020260
-Loading section .sdata, size 0x60 lma 0x80020b80
-Start address 0x80000080, load size 134108
-Transfer rate: 57 KB/sec, 9579 bytes/write.
-(gdb) 
+Loading section .init, size 0x5c lma 0x80000080
+Loading section .text, size 0x10cb4 lma 0x800000e0
+Loading section .rodata, size 0x238c lma 0x80010d98
+Loading section .eh_frame, size 0x3c lma 0x80013124
+Loading section .data, size 0x6cc lma 0x80013160
+Loading section .got, size 0x18 lma 0x8001382c
+Loading section .sdata, size 0x60 lma 0x80013848
+Start address 0x80000080, load size 80028
+Transfer rate: 51 KB/sec, 6669 bytes/write.
 ```
 
-7. At last, in **gdb**, you can run the **mnist** application by command **c**:
+1. Finally, in **gdb**, you can run the **fft** application with **the continue** command :
 ```
 (gdb) c
 Continuing.
@@ -204,17 +206,33 @@ Continuing.
 
 1. On the hyperterminal, you should see:
 ```
-Expected  = 4
-Predicted = 4
-Result : 1/1
-credence: 82
-image env0003: 1753389 instructions
-image env0003: 2818904 cycles
+FFT running...
+FFT finished
+kiss_fft took 124142 instructions and 169253 cycles
+SUCCESS : fft result values correct
 ```
 
 This result is obtained right after the FPGA bitstream loading.
-When MNIST is rerun, system is not at initial state. For instance, cache is preloaded.
+When fft is rerun, system is not at initial state. For instance, cache is preloaded.
 
+
+If the fft failed, you would see:
+```
+FFT running...
+FFT finished
+kiss_fft took 124142 instructions and 164674 cycles
+FAIL : fft result values incorrect
+Your out values:
+Real	Imag
+-262	-519
+-311	-507
+-369	493
+-439	471
+-538	-432
+-718	355
+-1455	-9
+...
+```
 
 # Simulation get started
 When the development environment is set up, it is now possible to run a simulation.
@@ -224,9 +242,9 @@ To simulate a software application on CVA6 processor, run the following command:
 ```
 make sim APP=’application to run’
 ```
-For instance, if you want to run the **mnist** application, you will have to run :
+For instance, if you want to run the **fft** application, you will have to run :
 ```
-make sim APP=mnist
+make sim APP=fft
 ```
 
 **This command:**
@@ -241,16 +259,6 @@ Moreover, all `printf` used in software application will be displayed into the *
 > Simulation may take a lot of time, you need to be patient to have results.
 
 Simulation is programmed to run 10000000 cycles but the result is displayed before the end of simulation.
-
-For **mnist** application, at the end of the simulation, result is diplayed as following:
-```
-Expected  = 4
-Predicted = 4
-Result : 1/1
-credence: 82
-image env0003: 1753389 instructions
-image env0003: 2721823 cycles
-```
 
 CVA6 software environment is detailed into `sw/app` directory.
 
