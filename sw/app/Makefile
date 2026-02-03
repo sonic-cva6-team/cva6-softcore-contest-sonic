@@ -47,7 +47,8 @@ bmarks = \
 	helloworld \
 	helloworld_printf \
 	mnist \
-	fft
+	fft \
+	cvxif-test
 
 #--------------------------------------------------------------------
 # Build rules
