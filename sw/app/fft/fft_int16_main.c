@@ -41,11 +41,11 @@ int main(void)
 
 	if (!cfg)
 	{
-		printf("FFT alloc failed\n");
+		printf("FFT alloc failed\r\n");
 		return 1;
 	}
 
-	printf("FFT running...\n");
+	printf("FFT running...\r\n");
 
 	// Run FFT
 	instret = -read_csr(minstret);
@@ -54,22 +54,22 @@ int main(void)
 	instret += read_csr(minstret);
 	cycles += read_csr(mcycle);
 
-	printf("FFT finished\n");
+	printf("FFT finished\r\n");
 
-	printf("kiss_fft took %u instructions and %u cycles\n", instret, cycles, instret, cycles);
+	printf("kiss_fft took %u instructions and %u cycles\r\n", instret, cycles, instret, cycles);
 
 	// compare gold and output
 	if (memcmp(cx_out, g_gold, 2 * N * sizeof(kiss_fft_scalar)) != 0)
 	{
-		printf("FAIL : fft result values incorrect\nYour out values:\nReal\tImag\n");
+		printf("FAIL : fft result values incorrect\nYour out values:\nReal\tImag\r\n");
 		for (int i = 0; i < N; i++)
 		{
-			printf("%d\t%d\n",cx_out[i].r,cx_out[i].i);
+			printf("%d\t%d\r\n",cx_out[i].r,cx_out[i].i);
 		}
 		return 1;
 	}
 
-	printf("SUCCESS : fft result values correct\n");
+	printf("SUCCESS : fft result values correct\r\n");
 
 	kiss_fft_free(cfg);
 	return 0;

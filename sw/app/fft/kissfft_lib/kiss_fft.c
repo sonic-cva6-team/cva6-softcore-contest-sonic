@@ -13,9 +13,9 @@
 
 static void kf_bfly2(
         kiss_fft_cpx * Fout,
-        const size_t fstride,
-        const kiss_fft_cfg st,
-        int m
+        const size_t fstride,   // stride for twiddle factor selection
+        const kiss_fft_cfg st,  // configuration/state info of twiddles
+        int m                   // m numbers in each sub-FFT (2 sub-FFTs)
         )
 {
     kiss_fft_cpx * Fout2;
@@ -25,20 +25,27 @@ static void kf_bfly2(
     do{
         C_FIXDIV(*Fout,2); C_FIXDIV(*Fout2,2);
 
-        C_MUL (t,  *Fout2 , *tw1);
-        tw1 += fstride;
-        C_SUB( *Fout2 ,  *Fout , t );
-        C_ADDTO( *Fout ,  t );
-        ++Fout2;
-        ++Fout;
+        /* twiddle multiply: multiply branch value by twiddle W_N^m
+         * This corresponds to the "twiddle multiply" step in the
+         * mixed-radix algorithm where each sub-DFT output is rotated
+         * before being combined by the m-point DFT. */
+        
+        C_MUL (t,  *Fout2 , *tw1);      // t = Fout2*W_N^m
+        tw1 += fstride;                 // advance to next twiddle 
+        C_SUB( *Fout2 ,  *Fout , t );   // Fout2 = Fout - t = Fout - Fout2*W_N^m
+        C_ADDTO( *Fout ,  t );          // Fout = Fout + t = Fout + Fout2*W_N^m
+        // Replace C_MUL, C_SUB, C_ADDTO with Inline Assembly in _kiss_fft_guts.h
+        
+        ++Fout2;                        // advance Fout2 to next pair
+        ++Fout;                         // advance Fout to next pair
     }while (--m);
 }
 
 static void kf_bfly4(
-        kiss_fft_cpx * Fout,
-        const size_t fstride,
-        const kiss_fft_cfg st,
-        const size_t m
+        kiss_fft_cpx * Fout,    
+        const size_t fstride,   // stride for twiddle factor selection
+        const kiss_fft_cfg st,  // configuration/state info of twiddles
+        const size_t m          // m numbers in each sub-FFT (4 sub-FFTs)
         )
 {
     kiss_fft_cpx *tw1,*tw2,*tw3;
@@ -66,27 +73,39 @@ static void kf_bfly4(
         tw2 += fstride*2;
         tw3 += fstride*3;
         C_ADDTO( *Fout , scratch[3] );
-
+        // Replace C_MUL, C_SUB, C_ADDTO with Inline Assembly in _kiss_fft_guts.h
+        
         if(st->inverse) {
+            /*
             Fout[m].r = scratch[5].r - scratch[4].i;
             Fout[m].i = scratch[5].i + scratch[4].r;
             Fout[m3].r = scratch[5].r + scratch[4].i;
             Fout[m3].i = scratch[5].i - scratch[4].r;
+            */
+            
+            // Replace with CPLX_ROT_INVERSE(Fout[m], scratch[5], scratch[4]);
+            CPLX_ROT_INVERSE(Fout[m], Fout[m3], scratch[5], scratch[4]);
         }else{
+            /*
             Fout[m].r = scratch[5].r + scratch[4].i;
             Fout[m].i = scratch[5].i - scratch[4].r;
             Fout[m3].r = scratch[5].r - scratch[4].i;
             Fout[m3].i = scratch[5].i + scratch[4].r;
+            */
+            
+            // Replace with CPLX_ROT_FORWARD(Fout[m], scratch[5], scratch[4]);
+            CPLX_ROT_FORWARD(Fout[m], Fout[m3], scratch[5], scratch[4]);
+
         }
         ++Fout;
     }while(--k);
 }
 
 static void kf_bfly3(
-         kiss_fft_cpx * Fout,
-         const size_t fstride,
-         const kiss_fft_cfg st,
-         size_t m
+        kiss_fft_cpx * Fout,
+        const size_t fstride,  // stride for twiddle factor selection
+        const kiss_fft_cfg st, // configuration/state info of twiddles
+        size_t m               // m numbers in each sub-FFT (3 sub-FFTs)
          )
 {
      size_t k=m;
@@ -101,6 +120,9 @@ static void kf_bfly3(
      do{
          C_FIXDIV(*Fout,3); C_FIXDIV(Fout[m],3); C_FIXDIV(Fout[m2],3);
 
+         /* Multiply the two branches by their twiddles (tw1, tw2).
+          * This is the twiddle-rotation of sub-DFT outputs before
+          * they are combined by the radix-3 algebra below. */
          C_MUL(scratch[1],Fout[m] , *tw1);
          C_MUL(scratch[2],Fout[m2] , *tw2);
 
@@ -128,9 +150,9 @@ static void kf_bfly3(
 
 static void kf_bfly5(
         kiss_fft_cpx * Fout,
-        const size_t fstride,
-        const kiss_fft_cfg st,
-        int m
+        const size_t fstride,  // stride for twiddle factor selection
+        const kiss_fft_cfg st, // configuration/state info of twiddles
+        int m                  // m numbers in each sub-FFT (5 sub-FFTs)
         )
 {
     kiss_fft_cpx *Fout0,*Fout1,*Fout2,*Fout3,*Fout4;
@@ -153,6 +175,10 @@ static void kf_bfly5(
         C_FIXDIV( *Fout0,5); C_FIXDIV( *Fout1,5); C_FIXDIV( *Fout2,5); C_FIXDIV( *Fout3,5); C_FIXDIV( *Fout4,5);
         scratch[0] = *Fout0;
 
+        /* twiddle multiplies: rotate each branch's output by the
+         * appropriate twiddle before combining. The algebra below
+         * performs the radix-5 combination (the p-point DFT across s).
+         */
         C_MUL(scratch[1] ,*Fout1, tw[u*fstride]);
         C_MUL(scratch[2] ,*Fout2, tw[2*u*fstride]);
         C_MUL(scratch[3] ,*Fout3, tw[3*u*fstride]);
@@ -217,11 +243,23 @@ static void kf_bfly_generic(
 
         k=u;
         for ( q1=0 ; q1<p ; ++q1 ) {
+            /* For this output index k we perform the p-point combine:
+             * - start with scratch[0] (the first branch)
+             * - add contributions from other branches q=1..p-1
+             *   each multiplied by the appropriate twiddle factor
+             *   twiddles[twidx]. This inner loop implements the
+             *   p-point DFT across the "s" index for fixed "u".
+             * In the mathematical notation from the earlier explanation
+             * this is X[u + v*m] = sum_{s=0..p-1} S_s(u) * W_p^{v*s}
+             * with the extra W_N^{u*s} twiddle already accounted for
+             * when selecting twidx.
+             */
             int twidx=0;
             Fout[ k ] = scratch[0];
             for (q=1;q<p;++q ) {
                 twidx += fstride * k;
                 if (twidx>=Norig) twidx-=Norig;
+                /* twiddle multiply: rotate scratch[q] then accumulate */
                 C_MUL(t,scratch[q] , twiddles[twidx] );
                 C_ADDTO( Fout[ k ] ,t);
             }
@@ -234,10 +272,10 @@ static void kf_bfly_generic(
 static
 void kf_work(
         kiss_fft_cpx * Fout,
-        const kiss_fft_cpx * f,
+        const kiss_fft_cpx * f,     // pointer to input samples 
         const size_t fstride,
         int in_stride,
-        int * factors,
+        int * factors,              // pointer into the factorization array produced by kf_factor: first p, then m, then next p,m...
         const kiss_fft_cfg st
         )
 {
@@ -281,13 +319,30 @@ void kf_work(
             // DFT of size m*p performed by doing
             // p instances of smaller DFTs of size m,
             // each one takes a decimated version of the input
-            kf_work( Fout , f, fstride*p, in_stride, factors,st);
+            /* --- SUB-DFT step ---
+             * This recursive call computes one of the p smaller DFTs of
+             * length m (these are the S_s(u) values in the mathematical
+             * explanation). The outer loop runs so that we compute all
+             * p sub-DFTs (for s = 0..p-1). The twiddle multiplications
+             * and the p-point combine are performed later by the
+             * butterfly functions (kf_bfly* / kf_bfly_generic).
+             */
+            kf_work(Fout , f, fstride*p, in_stride, factors,st);
             f += fstride*in_stride;
         }while( (Fout += m) != Fout_end );
     }
 
     Fout=Fout_beg;
 
+    /* --- COMBINE step ---
+     * At this point the p smaller DFTs of size m have been placed in
+     * the output buffer (they are the sub-DFT results S_s(u)). Now we
+     * recombine them into the p*m outputs for this stage. The
+     * recombination performs the p-point DFT across the "s" index and
+     * uses twiddle factors; the implementation is in the specialized
+     * butterflies (kf_bfly2/3/4/5) or the generic one
+     * (kf_bfly_generic).
+     */
     // recombine the p smaller DFTs
     switch (p) {
         case 2: kf_bfly2(Fout,fstride,st,m); break;
@@ -323,6 +378,11 @@ void kf_factor(int n,int * facbuf)
         n /= p;
         *facbuf++ = p;
         *facbuf++ = n;
+    /*  facbuf is populated by [p1,m1],[p2,m2,] ... until m=1
+    where
+    p[i] * m[i] = m[i-1]
+    m0 = n                  */
+    
     } while (n > 1);
 }
 
@@ -396,7 +456,7 @@ void kiss_fft_stride(kiss_fft_cfg st,const kiss_fft_cpx *fin,kiss_fft_cpx *fout,
         memcpy(fout,tmpbuf,sizeof(kiss_fft_cpx)*st->nfft);
         KISS_FFT_TMP_FREE(tmpbuf);
     }else{
-        kf_work( fout, fin, 1,in_stride, st->factors,st );
+        kf_work(fout, fin, 1,in_stride, st->factors,st);
     }
 }
 
