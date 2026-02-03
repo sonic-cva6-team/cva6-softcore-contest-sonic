@@ -18,6 +18,8 @@
 #include "kiss_fft_log.h"
 #include <limits.h>
 
+#define FIXED_POINT 16
+
 #define MAXFACTORS 32
 /* e.g. an fft of length 128 has 4 factors
  as far as kissfft is concerned

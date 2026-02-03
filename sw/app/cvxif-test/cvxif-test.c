@@ -22,55 +22,21 @@
 */
 
 
-#include "fft_int16_main.h"
+//#include "fft_int16_main.h"
+#include <stdio.h>
+#include <stdint.h>
 
 int main(void)
 {
-	// metrics
-	size_t instret = 0;
-	size_t cycles = 0;
+	int32_t a = 10, b = 20, res = 0;
+    printf("Calling custom ADD instruction with a=%d b=%d\r\n", a, b);
 
-	// input array
-	kiss_fft_cpx *cx_in = &g_cx_in;
+  	// Call custom1
+  	asm volatile (".insn r 0x7B, 1, 0, %0, %1, %2"
+              : "=r"(res)
+              : "r"(a), "r"(b));
 
-	// output array
-	kiss_fft_cpx cx_out[N];
+  	printf("Result: %u\r\n", res);
 
-	// FFT configuration
-	kiss_fft_cfg cfg = kiss_fft_alloc(N, 0, NULL, NULL);
-
-	if (!cfg)
-	{
-		printf("FFT alloc failed\r\n");
-		return 1;
-	}
-
-	printf("FFT running...\r\n");
-	// Run FFT
-	instret = -read_csr(minstret);
-	cycles = -read_csr(mcycle);
-	kiss_fft(cfg, cx_in, cx_out);
-	instret += read_csr(minstret);
-	cycles += read_csr(mcycle);
-
-	printf("FFT finished\r\n");
-
-	printf("kiss_fft took %u instructions and %u cycles\r\n", instret, cycles, instret, cycles);
-
-	// compare gold and output
-	if (memcmp(cx_out, g_gold, 2 * N * sizeof(kiss_fft_scalar)) != 0)
-	{
-		printf("FAIL : fft result values incorrect\nYour out values:\nReal\tImag\r\n");
-		for (int i = 0; i < N; i++)
-		{
-			printf("%d\t%d\r\n",cx_out[i].r,cx_out[i].i);
-		}
-		return 1;
-	}
-
-	printf("SUCCESS : fft result values correct\r\n");
-
-	kiss_fft_free(cfg);
 	return 0;
 }
-
