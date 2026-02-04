@@ -24,7 +24,8 @@
  4*4*4*2
  */
 
-struct kiss_fft_state{
+struct kiss_fft_state
+{
     int nfft;
     int inverse;
 
@@ -32,8 +33,8 @@ struct kiss_fft_state{
     int *factors;
     kiss_fft_cpx *twiddles;
 
-//     int factors[2*MAXFACTORS];
-//     kiss_fft_cpx twiddles[1];
+    //     int factors[2*MAXFACTORS];
+    //     kiss_fft_cpx twiddles[1];
 };
 
 /*
@@ -46,205 +47,118 @@ struct kiss_fft_state{
    C_ADDTO(res , a)    : res += a
 */
 
-#define FIXED_POINT 16
-#ifdef FIXED_POINT
 #include <stdint.h>
-#if (FIXED_POINT==32)
-# define FRACBITS 31
-# define SAMPPROD int64_t
-#define SAMP_MAX INT32_MAX
-#define SAMP_MIN INT32_MIN
-#else
 #define FRACBITS 15
 #define SAMPPROD int32_t
 #define SAMP_MAX INT16_MAX
 #define SAMP_MIN INT16_MIN
-#endif
+#define CHECK_OVERFLOW_OP(a, op, b)
 
-#if defined(CHECK_OVERFLOW)
-#  define CHECK_OVERFLOW_OP(a,op,b)  \
-    if ( (SAMPPROD)(a) op (SAMPPROD)(b) > SAMP_MAX || (SAMPPROD)(a) op (SAMPPROD)(b) < SAMP_MIN ) { \
-        KISS_FFT_WARNING("overflow (%d " #op" %d) = %ld", (a),(b),(SAMPPROD)(a) op (SAMPPROD)(b)); }
-#endif
+#define smul(a, b) ((SAMPPROD)(a) * (b))
+#define sround(x) (kiss_fft_scalar)(((x) + (1 << (FRACBITS - 1))) >> FRACBITS)
 
+#define S_MUL(a, b) sround(smul(a, b))
 
-#   define smul(a,b) ( (SAMPPROD)(a)*(b) )
-#   define sround( x )  (kiss_fft_scalar)( ( (x) + (1<<(FRACBITS-1)) ) >> FRACBITS )
-
-#   define S_MUL(a,b) sround( smul(a,b) )
-
-/*
-#   define C_MUL(m,a,b) \
-      do{ (m).r = sround( smul((a).r,(b).r) - smul((a).i,(b).i) ); \
-          (m).i = sround( smul((a).r,(b).i) + smul((a).i,(b).r) ); }while(0)
-*/
-
-#define C_MUL(m, a, b) \
-    asm volatile ( \
-        ".insn r 0x7B, 4, 0, %0, %1, %2" \
-        : "=r" (*(uint32_t*)&(m))   \
-        : "r"  (*(uint32_t*)&(a)), \
-          "r"  (*(uint32_t*)&(b))  \
-    );
-
-// 0x0B is the opcode for Custom Extension 3, 0x4 is the funct3 for MUL, 0x0 is the funct7 for MUL
-// (*(uint32_t*)&(variable)) is used to treat the kiss_fft_cpx struct as a single 32-bit integer for the purpose of the assembly instruction
-// -> need to change FIXED_POINT to 16 for this to work properly
-
-// Using C_MUL instruction for parallel multiplication of two complex numbers (SIMD style)
-
-
-#   define DIVSCALAR(x,k) \
-    (x) = sround( smul(  x, SAMP_MAX/k ) )
-
-#   define C_FIXDIV(c,div) \
-    do {    DIVSCALAR( (c).r , div);  \
-        DIVSCALAR( (c).i  , div); }while (0)
-
-#   define C_MULBYSCALAR( c, s ) \
-    do{ (c).r =  sround( smul( (c).r , s ) ) ;\
-        (c).i =  sround( smul( (c).i , s ) ) ; }while(0)
-
-#else  // not FIXED_POINT
-
-#   define S_MUL(a,b) ( (a)*(b) )
-#define C_MUL(m,a,b) \
-    do{ (m).r = (a).r*(b).r - (a).i*(b).i;\
-        (m).i = (a).r*(b).i + (a).i*(b).r; }while(0)
-
-#   define C_FIXDIV(c,div) /* NOOP */
-#   define C_MULBYSCALAR( c, s ) \
-    do{ (c).r *= (s);\
-        (c).i *= (s); }while(0)
-#endif
-
-#ifndef CHECK_OVERFLOW_OP
-#  define CHECK_OVERFLOW_OP(a,op,b)
-#endif
-/*
-#define  C_ADD( res, a,b)\
-    do { \
-        CHECK_OVERFLOW_OP((a).r,+,(b).r)\
-        CHECK_OVERFLOW_OP((a).i,+,(b).i)\
-        (res).r=(a).r+(b).r;  (res).i=(a).i+(b).i; \
-    }while(0)
-*/
-
-#define C_ADD(res, a, b) \
-        asm volatile ( \
-            ".insn r 0x7B, 2, 0, %0, %1, %2" \
-            : "=r" (*(uint32_t*)&(res))   \
-            : "r"  (*(uint32_t*)&(a)), \
-              "r"  (*(uint32_t*)&(b))  \
-        );
-/*
-#define  C_SUB(res, a,b)\
-    do { \
-        CHECK_OVERFLOW_OP((a).r,-,(b).r)\
-        CHECK_OVERFLOW_OP((a).i,-,(b).i)\
-        (res).r=(a).r-(b).r;  (res).i=(a).i-(b).i; \
-    }while(0)
-*/
-
-#define C_SUB(m, a, b) \
-    asm volatile ( \
+#define C_MUL(m, a, b)                   \
+    asm volatile(                        \
         ".insn r 0x7B, 3, 0, %0, %1, %2" \
-        : "=r" (*(uint32_t*)&(m))   \
-        : "r"  (*(uint32_t*)&(a)), \
-          "r"  (*(uint32_t*)&(b))  \
-    );
+        : "=r"(*(uint32_t *)&(m))        \
+        : "r"(*(uint32_t *)&(a)),        \
+          "r"(*(uint32_t *)&(b)));
 
-// 0x0B is the opcode for Custom Extension 0, 0x1 is the funct3 for MUL, 0x0 is the funct7 for MUL
+#define DIVSCALAR(x, k) \
+    (x) = sround(smul(x, SAMP_MAX / k))
 
-// Using C_SUB instruction for parallel subtraction of two complex numbers with SATURATION
+#define C_FIXDIV(c, div)       \
+    do                         \
+    {                          \
+        DIVSCALAR((c).r, div); \
+        DIVSCALAR((c).i, div); \
+    } while (0)
 
-/*    
-#define C_ADDTO( res , a)\
-    do { \
-        CHECK_OVERFLOW_OP((res).r,+,(a).r)\
-        CHECK_OVERFLOW_OP((res).i,+,(a).i)\
-        (res).r += (a).r;  (res).i += (a).i;\
-    }while(0)
-*/
- 
-#define C_ADDTO(res, a) \
-        asm volatile ( \
-            ".insn r 0x7B, 2, 0, %0, %1, %2" \
-            : "=r" (*(uint32_t*)&(res))   \
-            : "r"  (*(uint32_t*)&(res)), \
-              "r"  (*(uint32_t*)&(a))  \
-        );
+#define C_MULBYSCALAR(c, s)             \
+    do                                  \
+    {                                   \
+        (c).r = sround(smul((c).r, s)); \
+        (c).i = sround(smul((c).i, s)); \
+    } while (0)
 
-// 0x2B is the opcode for Custom Extension 1, 0x0 is the funct3 for ADDTO, 0x0 is the funct7 for ADDTO
+// ******************* Custom complex operations using CVX instructions *******************
 
-// Using C_ADDTO instruction for parallel addition of two complex numbers with SATURATION
+#define C_ADD(res, a, b)                 \
+    asm volatile(                        \
+        ".insn r 0x7B, 1, 0, %0, %1, %2" \
+        : "=r"(*(uint32_t *)&(res))      \
+        : "r"(*(uint32_t *)&(a)),        \
+          "r"(*(uint32_t *)&(b)));
 
- 
-#define C_ADD_ROT(res, a, b) \
-        asm volatile ( \
-            ".insn r 0x7B, 5, 0, %0, %1, %2" \
-            : "=r" (*(uint32_t*)&(res))   \
-            : "r"  (*(uint32_t*)&(a)), \
-              "r"  (*(uint32_t*)&(b))  \
-        );
+#define C_SUB(m, a, b)                   \
+    asm volatile(                        \
+        ".insn r 0x7B, 2, 0, %0, %1, %2" \
+        : "=r"(*(uint32_t *)&(m))        \
+        : "r"(*(uint32_t *)&(a)),        \
+          "r"(*(uint32_t *)&(b)));
 
-// 0x0B is the opcode for Custom Extension 0, 0x3 is the funct3 for MUL, 0x0 is the funct7 for MUL    
+#define C_ADDTO(res, a)                  \
+    asm volatile(                        \
+        ".insn r 0x7B, 1, 0, %0, %1, %2" \
+        : "=r"(*(uint32_t *)&(res))      \
+        : "r"(*(uint32_t *)&(res)),      \
+          "r"(*(uint32_t *)&(a)));
 
-#define C_SUB_ROT(res, a, b) \
-        asm volatile ( \
-            ".insn r 0x7B, 6, 0, %0, %1, %2" \
-            : "=r" (*(uint32_t*)&(res))   \
-            : "r"  (*(uint32_t*)&(a)), \
-              "r"  (*(uint32_t*)&(b))  \
-        );
+#define C_ADD_ROT(res, a, b)             \
+    asm volatile(                        \
+        ".insn r 0x7B, 4, 0, %0, %1, %2" \
+        : "=r"(*(uint32_t *)&(res))      \
+        : "r"(*(uint32_t *)&(a)),        \
+          "r"(*(uint32_t *)&(b)));
 
-// 0x0B is the opcode for Custom Extension 0, 0x4 is the funct3 for MUL, 0x0 is the funct7 for MUL
+#define C_SUB_ROT(res, a, b)             \
+    asm volatile(                        \
+        ".insn r 0x7B, 5, 0, %0, %1, %2" \
+        : "=r"(*(uint32_t *)&(res))      \
+        : "r"(*(uint32_t *)&(a)),        \
+          "r"(*(uint32_t *)&(b)));
+
+// ****************************************************************************************
 
 #define CPLX_ROT_INVERSE(out1, out2, s5, s4) \
-        do { \
-            C_ADD_ROT(out1, s5, s4); \
-            C_SUB_ROT(out2, s5, s4); \
-        } while(0)
+    do                                       \
+    {                                        \
+        C_ADD_ROT(out1, s5, s4);             \
+        C_SUB_ROT(out2, s5, s4);             \
+    } while (0)
 
 #define CPLX_ROT_FORWARD(out1, out2, s5, s4) \
-        do { \
-            C_SUB_ROT(out1, s5, s4); \
-            C_ADD_ROT(out2, s5, s4); \
-        } while(0)
+    do                                       \
+    {                                        \
+        C_SUB_ROT(out1, s5, s4);             \
+        C_ADD_ROT(out2, s5, s4);             \
+    } while (0)
 
-#define C_SUBFROM( res , a)\
-    do {\
-        CHECK_OVERFLOW_OP((res).r,-,(a).r)\
-        CHECK_OVERFLOW_OP((res).i,-,(a).i)\
-        (res).r -= (a).r;  (res).i -= (a).i; \
-    }while(0)
+#define C_SUBFROM(res, a)                    \
+    do                                       \
+    {                                        \
+        CHECK_OVERFLOW_OP((res).r, -, (a).r) \
+        CHECK_OVERFLOW_OP((res).i, -, (a).i) \
+        (res).r -= (a).r;                    \
+        (res).i -= (a).i;                    \
+    } while (0)
 
+#define KISS_FFT_COS(phase) floor(.5 + SAMP_MAX * cos(phase))
+#define KISS_FFT_SIN(phase) floor(.5 + SAMP_MAX * sin(phase))
+#define HALF_OF(x) ((x) >> 1)
 
-#ifdef FIXED_POINT
-#  define KISS_FFT_COS(phase)  floor(.5+SAMP_MAX * cos (phase))
-#  define KISS_FFT_SIN(phase)  floor(.5+SAMP_MAX * sin (phase))
-#  define HALF_OF(x) ((x)>>1)
-#elif defined(USE_SIMD)
-#  define KISS_FFT_COS(phase) _mm_set1_ps( cos(phase) )
-#  define KISS_FFT_SIN(phase) _mm_set1_ps( sin(phase) )
-#  define HALF_OF(x) ((x)*_mm_set1_ps(.5))
-#else
-#  define KISS_FFT_COS(phase) (kiss_fft_scalar) cos(phase)
-#  define KISS_FFT_SIN(phase) (kiss_fft_scalar) sin(phase)
-#  define HALF_OF(x) ((x)*((kiss_fft_scalar).5))
-#endif
-
-#define  kf_cexp(x,phase) \
-    do{ \
-        (x)->r = KISS_FFT_COS(phase);\
-        (x)->i = KISS_FFT_SIN(phase);\
-    }while(0)
-
+#define kf_cexp(x, phase)             \
+    do                                \
+    {                                 \
+        (x)->r = KISS_FFT_COS(phase); \
+        (x)->i = KISS_FFT_SIN(phase); \
+    } while (0)
 
 /* a debugging function */
-#define pcpx(c)\
-    KISS_FFT_DEBUG("%g + %gi\n",(double)((c)->r),(double)((c)->i))
-
+#define pcpx(c) \
+    KISS_FFT_DEBUG("%g + %gi\n", (double)((c)->r), (double)((c)->i))
 
 #ifdef KISS_FFT_USE_ALLOCA
 // define this to allow use of alloca instead of malloc for temporary buffers
@@ -252,11 +166,11 @@ struct kiss_fft_state{
 // 1. FFT sizes that have "bad" factors. i.e. not 2,3 and 5
 // 2. "in-place" FFTs.  Notice the quotes, since kissfft does not really do an in-place transform.
 #include <alloca.h>
-#define  KISS_FFT_TMP_ALLOC(nbytes) alloca(nbytes)
-#define  KISS_FFT_TMP_FREE(ptr)
+#define KISS_FFT_TMP_ALLOC(nbytes) alloca(nbytes)
+#define KISS_FFT_TMP_FREE(ptr)
 #else
-#define  KISS_FFT_TMP_ALLOC(nbytes) KISS_FFT_MALLOC(nbytes)
-#define  KISS_FFT_TMP_FREE(ptr) KISS_FFT_FREE(ptr)
+#define KISS_FFT_TMP_ALLOC(nbytes) KISS_FFT_MALLOC(nbytes)
+#define KISS_FFT_TMP_FREE(ptr) KISS_FFT_FREE(ptr)
 #endif
 
 #endif /* _kiss_fft_guts_h */
