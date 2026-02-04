@@ -134,6 +134,32 @@ module copro_alu
         we_n     = 1'b1;
       end
 
+      // complex FIXDIV ( (ar/2) + i(ai/2) )
+      cvxif_instr_pkg::C_FIXDIV: begin 
+        logic signed [15:0] c_r, c_i, scale;
+        logic signed [31:0] prod_r, prod_i;
+        logic signed [31:0] shifted_r, shifted_i;
+
+        c_r = registers_i[0][15:0];
+        c_i = registers_i[0][31:16];
+        scale = registers_i[1][15:0]; 
+
+        prod_r = c_r * scale;
+        prod_i = c_i * scale;
+
+        // Add rounding: (1 << 14) = 16384
+        shifted_r = prod_r + 32'sd16384;
+        shifted_i = prod_i + 32'sd16384;
+
+        res_r = 16'(shifted_r >>> 15);
+        res_i = 16'(shifted_i >>> 15);
+
+        result_n = {res_i, res_r};
+        valid_n  = 1'b1;
+        rd_n     = rd_i;
+        we_n     = 1'b1;
+      end 
+
       default: begin
         result_n = '0;
         hartid_n = '0;

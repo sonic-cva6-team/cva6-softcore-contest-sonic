@@ -71,13 +71,6 @@ struct kiss_fft_state
 #define DIVSCALAR(x, k) \
     (x) = sround(smul(x, SAMP_MAX / k))
 
-#define C_FIXDIV(c, div)       \
-    do                         \
-    {                          \
-        DIVSCALAR((c).r, div); \
-        DIVSCALAR((c).i, div); \
-    } while (0)
-
 #define C_MULBYSCALAR(c, s)             \
     do                                  \
     {                                   \
@@ -121,6 +114,19 @@ struct kiss_fft_state
         : "=r"(*(uint32_t *)&(res))      \
         : "r"(*(uint32_t *)&(a)),        \
           "r"(*(uint32_t *)&(b)));
+
+#define C_FIXDIV(c, div)                         \
+    do                                           \
+    {                                            \
+        int16_t scale_factor = SAMP_MAX / (div); \
+        uint32_t c_tmp = *(uint32_t *)&(c);      \
+        asm volatile(                            \
+            ".insn r 0x7B, 7, 0, %0, %1, %2"     \
+            : "=r"(c_tmp)                        \
+            : "r"(c_tmp),                        \
+              "r"((uint32_t)scale_factor));      \
+        *(uint32_t *)&(c) = c_tmp;               \
+    } while (0)
 
 // ****************************************************************************************
 

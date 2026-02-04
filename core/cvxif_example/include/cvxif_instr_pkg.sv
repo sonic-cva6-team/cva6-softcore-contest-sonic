@@ -6,7 +6,8 @@ package cvxif_instr_pkg;
     C_SUB = 4'b0010,
     C_MUL = 4'b0011,
     C_ADD_ROT = 4'b0100,
-    C_SUB_ROT = 4'b0101
+    C_SUB_ROT = 4'b0101,
+    C_FIXDIV = 4'b0110
 
   } opcode_t;
 
@@ -34,7 +35,7 @@ package cvxif_instr_pkg;
     compressed_resp_t resp;
   } copro_compressed_resp_t;
 
-  parameter int unsigned NbInstr = 5;
+  parameter int unsigned NbInstr = 6;
   parameter copro_issue_resp_t CoproInstr[NbInstr] = '{
       '{
           // Complex ADD (funct3=1)
@@ -75,6 +76,14 @@ package cvxif_instr_pkg;
           mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
           resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
           opcode: C_SUB_ROT
+      },
+      '{
+          // Complex FIXDIV (funct3=7)
+          instr:
+          32'b00000_00_00000_00000_1_11_00000_1111011,
+          mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
+          resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
+          opcode: C_FIXDIV
       }
 
   };
