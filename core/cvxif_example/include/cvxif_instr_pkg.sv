@@ -2,11 +2,12 @@ package cvxif_instr_pkg;
 
   typedef enum logic [3:0] {
     ILLEGAL = 4'b0000,
-    NOP     = 4'b0001,
-    ADD     = 4'b0010,
-    C_ADD   = 4'b0011,
-    C_SUB   = 4'b0100,
-    C_MUL   = 4'b0101
+    C_ADD = 4'b0001,
+    C_SUB = 4'b0010,
+    C_MUL = 4'b0011,
+    C_ADD_ROT = 4'b0100,
+    C_SUB_ROT = 4'b0101
+
   } opcode_t;
 
   typedef struct packed {
@@ -33,49 +34,49 @@ package cvxif_instr_pkg;
     compressed_resp_t resp;
   } copro_compressed_resp_t;
 
-  // NOP + ADD + C_ADD + C_SUB + C_MUL
   parameter int unsigned NbInstr = 5;
   parameter copro_issue_resp_t CoproInstr[NbInstr] = '{
       '{
-          // Custom NOP (funct3=0)
-          instr:
-          32'b00000_00_00000_00000_0_00_00000_1111011,
-          mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
-          resp: '{accept : 1'b1, writeback : 1'b0, register_read : {1'b0, 1'b0, 1'b0}},
-          opcode: NOP
-      },
-      '{
-          // Custom ADD (funct3=1)
+          // Complex ADD (funct3=1)
           instr:
           32'b00000_00_00000_00000_0_01_00000_1111011,
-          mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
-          resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
-          opcode: ADD
-      },
-      '{
-          // Complex ADD (funct3=2)
-          instr:
-          32'b00000_00_00000_00000_0_10_00000_1111011,
           mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
           resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
           opcode: C_ADD
       },
       '{
-          // Complex SUB (funct3=3)
+          // Complex SUB (funct3=2)
           instr:
-          32'b00000_00_00000_00000_0_11_00000_1111011,
+          32'b00000_00_00000_00000_0_10_00000_1111011,
           mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
           resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
           opcode: C_SUB
       },
       '{
-          // Complex MUL (funct3=4)
+          // Complex MUL (funct3=3)
+          instr:
+          32'b00000_00_00000_00000_0_11_00000_1111011,
+          mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
+          resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
+          opcode: C_MUL
+      },
+      '{
+          // Complex ADD with rotation (funct3=5)
           instr:
           32'b00000_00_00000_00000_1_00_00000_1111011,
           mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
           resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
-          opcode: C_MUL
+          opcode: C_ADD_ROT
+      },
+      '{
+          // Complex SUB with rotation (funct3=6)
+          instr:
+          32'b00000_00_00000_00000_1_01_00000_1111011,
+          mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
+          resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
+          opcode: C_SUB_ROT
       }
+
   };
 
   // Dummy compressed instructions

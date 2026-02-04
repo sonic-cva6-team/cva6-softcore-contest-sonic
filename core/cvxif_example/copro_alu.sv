@@ -1,5 +1,4 @@
-// CVXIF coprocessor enabling complex arithmetic operations
-// Original Author: Martin ROUXEL - IMT Atlantique
+// Authors: Thang VO, Martin ROUXEL - IMT Atlantque
 
 module copro_alu
   import cvxif_instr_pkg::*;
@@ -44,13 +43,8 @@ module copro_alu
   assign rd_o     = rd_q;
   assign we_o     = we_q;
 
-  function automatic logic signed [15:0] sat16(input logic signed [31:0] x);
-    begin
-      if (x > 32'sd32767) sat16 = 16'sd32767;
-      else if (x < -32'sd32768) sat16 = -16'sd32768;
-      else sat16 = x[15:0];
-    end
-  endfunction
+  logic signed [15:0] r1_r, r1_i, r2_r, r2_i;
+  logic signed [15:0] res_r, res_i;
 
   always_comb begin
     result_n = '0;
@@ -60,61 +54,81 @@ module copro_alu
     rd_n     = '0;
     we_n     = 1'b0;
 
-    a_re     = $signed(registers_i[0][31:16]);
-    a_im     = $signed(registers_i[0][15:0]);
-    b_re     = $signed(registers_i[1][31:16]);
-    b_im     = $signed(registers_i[1][15:0]);
-
-    re32     = '0;
-    im32     = '0;
-    ac       = '0;
-    bd       = '0;
-    ad       = '0;
-    bc       = '0;
+    r1_r     = registers_i[0][15:0];
+    r1_i     = registers_i[0][31:16];
+    r2_r     = registers_i[1][15:0];
+    r2_i     = registers_i[1][31:16];
 
     case (opcode_i)
-      cvxif_instr_pkg::NOP: begin
-        result_n = '0;
-        valid_n  = 1'b1;
-        rd_n     = '0;
-        we_n     = 1'b0;
-      end
 
-      cvxif_instr_pkg::ADD: begin
-        result_n = registers_i[1] + registers_i[0];
-        valid_n  = 1'b1;
-        rd_n     = rd_i;
-        we_n     = 1'b1;
-      end
-
+      // complex ADD ((ar+br)+i(ai+bi))
       cvxif_instr_pkg::C_ADD: begin
-        re32     = $signed(a_re) + $signed(b_re);
-        im32     = $signed(a_im) + $signed(b_im);
-        result_n = {sat16(re32), sat16(im32)};
+        res_r    = r1_r + r2_r;
+        res_i    = r1_i + r2_i;
+
+        result_n = {res_i, res_r};
+
         valid_n  = 1'b1;
         rd_n     = rd_i;
         we_n     = 1'b1;
       end
 
+      // complex SUB ((ar-br)+i(ai-bi))
       cvxif_instr_pkg::C_SUB: begin
-        re32     = $signed(a_re) - $signed(b_re);
-        im32     = $signed(a_im) - $signed(b_im);
-        result_n = {sat16(re32), sat16(im32)};
+
+        res_r    = r1_r - r2_r;
+        res_i    = r1_i - r2_i;
+
+        result_n = {res_i, res_r};
         valid_n  = 1'b1;
         rd_n     = rd_i;
         we_n     = 1'b1;
       end
 
+      // complex MUL ((ar*br - ai*bi)+i(ar*bi + ai*br))
       cvxif_instr_pkg::C_MUL: begin
-        ac       = $signed(a_re) * $signed(b_re);
-        bd       = $signed(a_im) * $signed(b_im);
-        ad       = $signed(a_re) * $signed(b_im);
-        bc       = $signed(a_im) * $signed(b_re);
+        logic signed [31:0] re_long, im_long;
+        logic signed [31:0] p1, p2, p3, p4;
 
-        re32     = ac - bd;
-        im32     = ad + bc;
+        p1       = r1_r * r2_r;
+        p2       = r1_i * r2_i;
+        p3       = r1_r * r2_i;
+        p4       = r1_i * r2_r;
 
-        result_n = {re32[31:16], im32[31:16]};
+        re_long  = p1 - p2;
+        im_long  = p3 + p4;
+
+        // Rounding logic: (x + 16384) >> 15
+        // 16384 is (1 << 14)
+        res_r    = 16'((re_long + 32'sd16384) >>> 15);
+        res_i    = 16'((im_long + 32'sd16384) >>> 15);
+
+        result_n = {res_i, res_r};
+        valid_n  = 1'b1;
+        rd_n     = rd_i;
+        we_n     = 1'b1;
+      end
+
+      // complex ADD with rotation ((ar - bi)+i(ai + br))
+      cvxif_instr_pkg::C_ADD_ROT: begin
+
+        res_r    = r1_r - r2_i;
+        res_i    = r1_i + r2_r;
+
+        result_n = {res_i, res_r};
+
+        valid_n  = 1'b1;
+        rd_n     = rd_i;
+        we_n     = 1'b1;
+      end
+
+      // complex SUB with rotation ((ar + bi)+i(ai - br))
+      cvxif_instr_pkg::C_SUB_ROT: begin
+
+        res_r    = r1_r + r2_i;
+        res_i    = r1_i - r2_r;
+
+        result_n = {res_i, res_r};
         valid_n  = 1'b1;
         rd_n     = rd_i;
         we_n     = 1'b1;
@@ -128,6 +142,7 @@ module copro_alu
         rd_n     = '0;
         we_n     = '0;
       end
+
     endcase
   end
 

@@ -69,7 +69,7 @@ extern "C" {
 # endif
 #endif
 
-
+#define FIXED_POINT 16
 #ifdef FIXED_POINT
 #include <stdint.h>
 # if (FIXED_POINT == 32)
