@@ -32,6 +32,10 @@ module copro_alu
   logic [4:0] rd_n, rd_q;
   logic we_n, we_q;
 
+  logic signed [15:0] a_re, a_im, b_re, b_im;
+  logic signed [31:0] re32, im32;
+  logic signed [31:0] ac, bd, ad, bc;
+
   assign result_o = result_q;
   assign hartid_o = hartid_q;
   assign id_o     = id_q;
