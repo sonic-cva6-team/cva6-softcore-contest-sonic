@@ -43,7 +43,7 @@ module copro_alu
   assign rd_o     = rd_q;
   assign we_o     = we_q;
 
-  logic signed [15:0] r1_r, r1_i, r2_r, r2_i;
+  logic signed [15:0] r1_r, r1_i, r2_r, r2_i, r3_r, r3_i;
   logic signed [15:0] res_r, res_i;
 
   always_comb begin
@@ -58,6 +58,8 @@ module copro_alu
     r1_i     = registers_i[0][31:16];
     r2_r     = registers_i[1][15:0];
     r2_i     = registers_i[1][31:16];
+    r3_r     = registers_i[2][15:0];
+    r3_i     = registers_i[2][31:16];
 
     case (opcode_i)
 
@@ -153,6 +155,76 @@ module copro_alu
 
         res_r = 16'(shifted_r >>> 15);
         res_i = 16'(shifted_i >>> 15);
+
+        result_n = {res_i, res_r};
+        valid_n  = 1'b1;
+        rd_n     = rd_i;
+        we_n     = 1'b1;
+      end
+
+      // BUTTERFLY_R2_ADD: rd = rs1/2 + rs2/2
+      // Optimized radix-2 butterfly for identity twiddle (no multiplication needed)
+      // Combines FIXDIV and ADD into single operation
+      cvxif_instr_pkg::BUTTERFLY_R2_ADD: begin
+        logic signed [15:0] rs1_r_div2, rs1_i_div2, rs2_r_div2, rs2_i_div2;
+        logic signed [31:0] shifted_rs1_r, shifted_rs1_i, shifted_rs2_r, shifted_rs2_i;
+        logic signed [15:0] rs1_r, rs1_i, rs2_r, rs2_i;
+
+        // Divide both inputs by 2 (arithmetic right shift)
+        rs1_r_div2 = r1_r >>> 1;
+        rs1_i_div2 = r1_i >>> 1;
+        rs2_r_div2 = r2_r >>> 1;
+        rs2_i_div2 = r2_i >>> 1;
+
+        // Add rounding: (1 << 14) = 16384
+        shifted_rs1_r = rs1_r_div2 + 16'sd16384;
+        shifted_rs1_i = rs1_i_div2 + 16'sd16384;
+        shifted_rs2_r = rs2_r_div2 + 16'sd16384;
+        shifted_rs2_i = rs2_i_div2 + 16'sd16384;
+
+        rs1_r = 16'(shifted_rs1_r >>> 15);
+        rs1_i = 16'(shifted_rs1_i >>> 15);
+        rs2_r = 16'(shifted_rs2_r >>> 15);
+        rs2_i = 16'(shifted_rs2_i >>> 15);
+
+        // Add the divided values
+        res_r = rs1_r + rs2_r;
+        res_i = rs1_i;
+
+        result_n = {res_i, res_r};
+        valid_n  = 1'b1;
+        rd_n     = rd_i;
+        we_n     = 1'b1;
+      end
+
+      // BUTTERFLY_R2_SUB: rd = rs1/2 - rs2/2
+      // Optimized radix-2 butterfly for identity twiddle (no multiplication needed)
+      // Combines FIXDIV and SUB into single operation
+      cvxif_instr_pkg::BUTTERFLY_R2_SUB: begin
+        logic signed [15:0] rs1_r_div2, rs1_i_div2, rs2_r_div2, rs2_i_div2;
+        logic signed [31:0] shifted_rs1_r, shifted_rs1_i, shifted_rs2_r, shifted_rs2_i;
+        logic signed [15:0] rs1_r, rs1_i, rs2_r, rs2_i;
+
+        // Divide both inputs by 2 (arithmetic right shift)
+        rs1_r_div2 = r1_r >>> 1;
+        rs1_i_div2 = r1_i >>> 1;
+        rs2_r_div2 = r2_r >>> 1;
+        rs2_i_div2 = r2_i >>> 1;
+
+        // Add rounding: (1 << 14) = 16384
+        shifted_rs1_r = rs1_r_div2 + 16'sd16384;
+        shifted_rs1_i = rs1_i_div2 + 16'sd16384;
+        shifted_rs2_r = rs2_r_div2 + 16'sd16384;
+        shifted_rs2_i = rs2_i_div2 + 16'sd16384;
+
+        rs1_r = 16'(shifted_rs1_r >>> 15);
+        rs1_i = 16'(shifted_rs1_i >>> 15);
+        rs2_r = 16'(shifted_rs2_r >>> 15);
+        rs2_i = 16'(shifted_rs2_i >>> 15);
+
+        // Subtract the divided values
+        res_r = rs1_r - rs2_r;
+        res_i = rs1_i;
 
         result_n = {res_i, res_r};
         valid_n  = 1'b1;

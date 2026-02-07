@@ -61,13 +61,6 @@ struct kiss_fft_state
 
 #define S_MUL(a, b) sround(smul(a, b))
 
-#define C_MUL(m, a, b)                   \
-    asm volatile(                        \
-        ".insn r 0x7B, 3, 0, %0, %1, %2" \
-        : "=r"(*(uint32_t *)&(m))        \
-        : "r"(*(uint32_t *)&(a)),        \
-          "r"(*(uint32_t *)&(b)));
-
 #define DIVSCALAR(x, k) \
     (x) = sround(smul(x, SAMP_MAX / k))
 
@@ -79,6 +72,13 @@ struct kiss_fft_state
     } while (0)
 
 // ******************* Custom complex operations using CVX instructions *******************
+
+#define C_MUL(m, a, b)                   \
+    asm volatile(                        \
+        ".insn r 0x7B, 3, 0, %0, %1, %2" \
+        : "=r"(*(uint32_t *)&(m))        \
+        : "r"(*(uint32_t *)&(a)),        \
+          "r"(*(uint32_t *)&(b)));
 
 #define C_ADD(res, a, b)                 \
     asm volatile(                        \
@@ -129,6 +129,23 @@ struct kiss_fft_state
     } while (0)
 
 // ****************************************************************************************
+
+// Simplified Radix-2 Butterfly Instructions
+// Optimized for identity twiddle factors (32767, 0) - no multiplication needed!
+// These combine FIXDIV by 2 (right shift) with ADD/SUB in single instructions
+#define BUTTERFLY_R2_ADD(res, a, b)              \
+    asm volatile(                                \
+        ".insn r 0x7B, 0, 1, %0, %1, %2"         \
+        : "=r"(*(uint32_t *)&(res))              \
+        : "r"(*(uint32_t *)&(a)),                \
+          "r"(*(uint32_t *)&(b)));                
+
+#define BUTTERFLY_R2_SUB(res, a, b)              \
+    asm volatile(                                \
+        ".insn r 0x7B, 0, 2, %0, %1, %2"         \
+        : "=r"(*(uint32_t *)&(res))              \
+        : "r"(*(uint32_t *)&(a)),                \
+          "r"(*(uint32_t *)&(b)));                
 
 #define CPLX_ROT_INVERSE(out1, out2, s5, s4) \
     do                                       \
@@ -181,4 +198,4 @@ struct kiss_fft_state
 #define KISS_FFT_TMP_FREE(ptr) KISS_FFT_FREE(ptr)
 #endif
 
-#endif /* _kiss_fft_guts_h */
+#endif
