@@ -19,19 +19,17 @@ static void kf_bfly2(
         )
 {
     kiss_fft_cpx * Fout2;
-    kiss_fft_cpx temp_Fout;  // Temporary to save original Fout
+    kiss_fft_cpx tmp;
     Fout2 = Fout + m;
     do{   
         /* Optimized radix-2 butterfly for identity twiddle (32767, 0)
          * No multiplication needed - just divide by 2 and add/subtract
-         * BUTTERFLY_R2_ADD: Fout_new = Fout/2 + Fout2/2 
-         * BUTTERFLY_R2_SUB: Fout2_new = temp_Fout/2 - Fout2/2
          */
-        temp_Fout = *Fout; 
-        BUTTERFLY_R2_ADD(*Fout, *Fout, *Fout2);     
-        BUTTERFLY_R2_SUB(*Fout2, temp_Fout, *Fout2);
-        // Replace BUTTERFLY_R2_ADD, BUTTERFLY_R2_SUB with Inline Assembly in _kiss_fft_guts.h
-
+        tmp = *Fout2;
+        BUTTERFLY_R2_SUB(*Fout2, *Fout, tmp); 
+        BUTTERFLY_R2_ADD(*Fout, *Fout, tmp);
+        
+      
         ++Fout2;                       
         ++Fout;                         
     }while (--m);
@@ -56,16 +54,17 @@ static void kf_bfly4(
     do {
         C_FIXDIV4(*Fout,4); 
         
-        C_FIXDIV4(Fout[m],4); 
-        C_FIXDIV4(Fout[m2],4); 
-        C_FIXDIV4(Fout[m3],4);
-        C_MUL(scratch[0],Fout[m] , *tw1 );
-        C_MUL(scratch[1],Fout[m2] , *tw2 );
-        C_MUL(scratch[2],Fout[m3] , *tw3 );
+        //C_FIXDIV4(Fout[m],4); 
+        //C_FIXDIV4(Fout[m2],4); 
+        //C_FIXDIV4(Fout[m3],4);
+        //C_MUL(scratch[0],Fout[m] , *tw1 );
+        //C_MUL(scratch[1],Fout[m2] , *tw2 );
+        //C_MUL(scratch[2],Fout[m3] , *tw3 );
 
-        //C_MULDIV4(scratch[0],Fout[m] , *tw1 );
-        //C_MULDIV4(scratch[1],Fout[m2] , *tw2 );
-        //C_MULDIV4(scratch[2],Fout[m3] , *tw3 );
+        C_MULDIV4(scratch[0],Fout[m] , *tw1 );
+        C_MULDIV4(scratch[1],Fout[m2] , *tw2 );
+        C_MULDIV4(scratch[2],Fout[m3] , *tw3 );
+        C_FIXDIV4(Fout[m2],4); 
 
         C_SUB( scratch[5] , *Fout, scratch[1] );
         C_SUB( scratch[4] , scratch[0] , scratch[2] );

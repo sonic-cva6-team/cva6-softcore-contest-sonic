@@ -4,10 +4,10 @@ package cvxif_instr_pkg;
     ILLEGAL = 4'b0000,
     C_ADD = 4'b0001,
     C_SUB = 4'b0010,
-    C_MUL = 4'b0011,
+    C_MULDIV4 = 4'b0011,
     C_ADD_ROT = 4'b0100,
     C_SUB_ROT = 4'b0101,
-    C_FIXDIV = 4'b0110,
+    C_FIXDIV4 = 4'b0110,
     BUTTERFLY_R2_ADD = 4'b0111,
     BUTTERFLY_R2_SUB = 4'b1000
 
@@ -61,7 +61,7 @@ package cvxif_instr_pkg;
           32'b00000_00_00000_00000_0_11_00000_1111011,
           mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
           resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
-          opcode: C_MUL
+          opcode: C_MULDIV4
       },
       '{
           // Complex ADD with rotation (funct3=5)
@@ -100,7 +100,7 @@ package cvxif_instr_pkg;
           // Butterfly Radix-2 SUB: rd = rs1/2 - rs2/2
           // Optimized for identity twiddle (32767, 0) - no multiplication needed
           instr:
-          32'b00000_00_00000_00000_0_00_00010_1011011,
+          32'b00000_00_00000_00000_0_10_00000_1011011,
           mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
           resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
           opcode: BUTTERFLY_R2_SUB

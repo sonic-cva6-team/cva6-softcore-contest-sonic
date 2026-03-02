@@ -77,10 +77,13 @@ struct kiss_fft_state
 #define C_FIXDIV(c,div) \
     do {    DIVSCALAR( (c).r , div);  \
         DIVSCALAR( (c).i  , div); }while (0)
+#define C_MUL(m,a,b) \
+      do{ (m).r = sround( smul((a).r,(b).r) - smul((a).i,(b).i) ); \
+          (m).i = sround( smul((a).r,(b).i) + smul((a).i,(b).r) ); }while(0)
 
 // ******************* Custom complex operations using CVX instructions *******************
 
-#define C_MUL(m, a, b)                   \
+#define C_MULDIV4(m, a, b)                   \
     asm volatile(                        \
         ".insn r 0x7B, 3, 0, %0, %1, %2" \
         : "=r"(*(uint32_t *)&(m))        \

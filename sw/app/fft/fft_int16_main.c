@@ -24,7 +24,7 @@
 
 #include "fft_int16_main.h"
 #define FFT_RUNS 5000
-#define FFT_BENCHMARK
+//#define FFT_BENCHMARK
 
 #ifndef FFT_BENCHMARK
 

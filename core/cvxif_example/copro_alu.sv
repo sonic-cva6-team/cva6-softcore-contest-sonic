@@ -43,7 +43,7 @@ module copro_alu
   assign rd_o     = rd_q;
   assign we_o     = we_q;
 
-  logic signed [15:0] r1_r, r1_i, r2_r, r2_i, r3_r, r3_i;
+  logic signed [15:0] r1_r, r1_i, r2_r, r2_i;
   logic signed [15:0] res_r, res_i;
 
   always_comb begin
@@ -58,8 +58,6 @@ module copro_alu
     r1_i     = registers_i[0][31:16];
     r2_r     = registers_i[1][15:0];
     r2_i     = registers_i[1][31:16];
-    r3_r     = registers_i[2][15:0];
-    r3_i     = registers_i[2][31:16];
 
     case (opcode_i)
 
@@ -88,14 +86,21 @@ module copro_alu
       end
 
       // complex MUL ((ar*br - ai*bi)+i(ar*bi + ai*br))
-      cvxif_instr_pkg::C_MUL: begin
+      cvxif_instr_pkg::C_MULDIV4: begin
+        logic signed [31:0] div_temp_r, div_temp_i;
+        logic signed [15:0] r1_div4_r, r1_div4_i;
         logic signed [31:0] re_long, im_long;
         logic signed [31:0] p1, p2, p3, p4;
 
-        p1       = r1_r * r2_r;
-        p2       = r1_i * r2_i;
-        p3       = r1_r * r2_i;
-        p4       = r1_i * r2_r;
+        div_temp_r = (32'(r1_r) <<< 13) - 32'(r1_r) + 32'sd16384;
+        div_temp_i = (32'(r1_i) <<< 13) - 32'(r1_i) + 32'sd16384;
+        r1_div4_r = 16'(div_temp_r >>> 15);
+        r1_div4_i = 16'(div_temp_i >>> 15);
+
+        p1       = r1_div4_r * r2_r;
+        p2       = r1_div4_i * r2_i;
+        p3       = r1_div4_r * r2_i;
+        p4       = r1_div4_i * r2_r;
 
         re_long  = p1 - p2;
         im_long  = p3 + p4;
@@ -142,8 +147,14 @@ module copro_alu
 
         // Divide by 4 (arithmetic right shift by 2)
         // Q15 format stays Q15, no additional shifting needed
-        res_r = r1_r >>> 2;
-        res_i = r1_i >>> 2;
+        // Add rounding bias before shifting
+        logic signed [31:0] r1_r_ext, r1_i_ext;
+
+        r1_i_ext = (32'(r1_i) <<< 13) - 32'(r1_i) + 32'sd16384; // (r1_i * 16384) - r1_i + 16384 for rounding
+        r1_r_ext = (32'(r1_r) <<< 13) - 32'(r1_r) + 32'sd16384;
+
+        res_r = 16'(r1_r_ext >>> 15);
+        res_i = 16'(r1_i_ext >>> 15);
 
         result_n = {res_i, res_r};
         valid_n  = 1'b1;
@@ -156,13 +167,19 @@ module copro_alu
       // Combines FIXDIV and ADD into single operation
       // Power-of-2 division via shift - no rounding needed
       cvxif_instr_pkg::BUTTERFLY_R2_ADD: begin
-        logic signed [15:0] rs1_r_div2, rs1_i_div2, rs2_r_div2, rs2_i_div2;
 
-        // Divide both inputs by 2 (arithmetic right shift by 1)
-        rs1_r_div2 = r1_r >>> 1;
-        rs1_i_div2 = r1_i >>> 1;
-        rs2_r_div2 = r2_r >>> 1;
-        rs2_i_div2 = r2_i >>> 1;
+        logic signed [15:0] rs1_r_div2, rs1_i_div2, rs2_r_div2, rs2_i_div2;
+        logic signed [31:0] temp_r1, temp_i1, temp_r2, temp_i2;
+
+        temp_r1 = (32'(r1_r) <<< 14) - 32'(r1_r) + 32'sd16384;
+        temp_i1 = (32'(r1_i) <<< 14) - 32'(r1_i) + 32'sd16384;
+        temp_r2 = (32'(r2_r) <<< 14) - 32'(r2_r) + 32'sd16384;
+        temp_i2 = (32'(r2_i) <<< 14) - 32'(r2_i) + 32'sd16384;
+
+        rs1_r_div2 = 16'(temp_r1 >>> 15);
+        rs1_i_div2 = 16'(temp_i1 >>> 15);
+        rs2_r_div2 = 16'(temp_r2 >>> 15);
+        rs2_i_div2 = 16'(temp_i2 >>> 15);
 
         // Add the divided values (both real and imaginary parts)
         res_r = rs1_r_div2 + rs2_r_div2;
@@ -179,13 +196,19 @@ module copro_alu
       // Combines FIXDIV and SUB into single operation
       // Power-of-2 division via shift - no rounding needed
       cvxif_instr_pkg::BUTTERFLY_R2_SUB: begin
-        logic signed [15:0] rs1_r_div2, rs1_i_div2, rs2_r_div2, rs2_i_div2;
 
-        // Divide both inputs by 2 (arithmetic right shift by 1)
-        rs1_r_div2 = r1_r >>> 1;
-        rs1_i_div2 = r1_i >>> 1;
-        rs2_r_div2 = r2_r >>> 1;
-        rs2_i_div2 = r2_i >>> 1;
+        logic signed [15:0] rs1_r_div2, rs1_i_div2, rs2_r_div2, rs2_i_div2;
+        logic signed [31:0] temp_r1, temp_i1, temp_r2, temp_i2;
+
+        temp_r1 = (32'(r1_r) <<< 14) - 32'(r1_r) + 32'sd16384;
+        temp_i1 = (32'(r1_i) <<< 14) - 32'(r1_i) + 32'sd16384;
+        temp_r2 = (32'(r2_r) <<< 14) - 32'(r2_r) + 32'sd16384;
+        temp_i2 = (32'(r2_i) <<< 14) - 32'(r2_i) + 32'sd16384;
+
+        rs1_r_div2 = 16'(temp_r1 >>> 15);
+        rs1_i_div2 = 16'(temp_i1 >>> 15);
+        rs2_r_div2 = 16'(temp_r2 >>> 15);
+        rs2_i_div2 = 16'(temp_i2 >>> 15);
 
         // Subtract the divided values (both real and imaginary parts)
         res_r = rs1_r_div2 - rs2_r_div2;
@@ -196,76 +219,6 @@ module copro_alu
         rd_n     = rd_i;
         we_n     = 1'b1;
       end
-
-      // BUTTERFLY_R2_ADD: rd = rs1/2 + rs2/2
-      // Optimized radix-2 butterfly for identity twiddle (no multiplication needed)
-      // Combines FIXDIV and ADD into single operation
-      cvxif_instr_pkg::BUTTERFLY_R2_ADD: begin
-        logic signed [15:0] rs1_r_div2, rs1_i_div2, rs2_r_div2, rs2_i_div2;
-        logic signed [31:0] shifted_rs1_r, shifted_rs1_i, shifted_rs2_r, shifted_rs2_i;
-        logic signed [15:0] rs1_r, rs1_i, rs2_r, rs2_i;
-
-        // Divide both inputs by 2 (arithmetic right shift)
-        rs1_r_div2 = r1_r >>> 1;
-        rs1_i_div2 = r1_i >>> 1;
-        rs2_r_div2 = r2_r >>> 1;
-        rs2_i_div2 = r2_i >>> 1;
-
-        // Add rounding: (1 << 14) = 16384
-        shifted_rs1_r = rs1_r_div2 + 16'sd16384;
-        shifted_rs1_i = rs1_i_div2 + 16'sd16384;
-        shifted_rs2_r = rs2_r_div2 + 16'sd16384;
-        shifted_rs2_i = rs2_i_div2 + 16'sd16384;
-
-        rs1_r = 16'(shifted_rs1_r >>> 15);
-        rs1_i = 16'(shifted_rs1_i >>> 15);
-        rs2_r = 16'(shifted_rs2_r >>> 15);
-        rs2_i = 16'(shifted_rs2_i >>> 15);
-
-        // Add the divided values
-        res_r = rs1_r + rs2_r;
-        res_i = rs1_i;
-
-        result_n = {res_i, res_r};
-        valid_n  = 1'b1;
-        rd_n     = rd_i;
-        we_n     = 1'b1;
-      end
-
-      // BUTTERFLY_R2_SUB: rd = rs1/2 - rs2/2
-      // Optimized radix-2 butterfly for identity twiddle (no multiplication needed)
-      // Combines FIXDIV and SUB into single operation
-      cvxif_instr_pkg::BUTTERFLY_R2_SUB: begin
-        logic signed [15:0] rs1_r_div2, rs1_i_div2, rs2_r_div2, rs2_i_div2;
-        logic signed [31:0] shifted_rs1_r, shifted_rs1_i, shifted_rs2_r, shifted_rs2_i;
-        logic signed [15:0] rs1_r, rs1_i, rs2_r, rs2_i;
-
-        // Divide both inputs by 2 (arithmetic right shift)
-        rs1_r_div2 = r1_r >>> 1;
-        rs1_i_div2 = r1_i >>> 1;
-        rs2_r_div2 = r2_r >>> 1;
-        rs2_i_div2 = r2_i >>> 1;
-
-        // Add rounding: (1 << 14) = 16384
-        shifted_rs1_r = rs1_r_div2 + 16'sd16384;
-        shifted_rs1_i = rs1_i_div2 + 16'sd16384;
-        shifted_rs2_r = rs2_r_div2 + 16'sd16384;
-        shifted_rs2_i = rs2_i_div2 + 16'sd16384;
-
-        rs1_r = 16'(shifted_rs1_r >>> 15);
-        rs1_i = 16'(shifted_rs1_i >>> 15);
-        rs2_r = 16'(shifted_rs2_r >>> 15);
-        rs2_i = 16'(shifted_rs2_i >>> 15);
-
-        // Subtract the divided values
-        res_r = rs1_r - rs2_r;
-        res_i = rs1_i;
-
-        result_n = {res_i, res_r};
-        valid_n  = 1'b1;
-        rd_n     = rd_i;
-        we_n     = 1'b1;
-      end 
 
       default: begin
         result_n = '0;
