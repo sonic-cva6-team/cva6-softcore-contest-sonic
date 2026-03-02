@@ -54,16 +54,24 @@ static void kf_bfly4(
     tw3 = tw2 = tw1 = st->twiddles;
 
     do {
-        C_FIXDIV(*Fout,4); C_FIXDIV(Fout[m],4); C_FIXDIV(Fout[m2],4); C_FIXDIV(Fout[m3],4);
-
+        C_FIXDIV4(*Fout,4); 
+        
+        C_FIXDIV4(Fout[m],4); 
+        C_FIXDIV4(Fout[m2],4); 
+        C_FIXDIV4(Fout[m3],4);
         C_MUL(scratch[0],Fout[m] , *tw1 );
         C_MUL(scratch[1],Fout[m2] , *tw2 );
         C_MUL(scratch[2],Fout[m3] , *tw3 );
 
+        //C_MULDIV4(scratch[0],Fout[m] , *tw1 );
+        //C_MULDIV4(scratch[1],Fout[m2] , *tw2 );
+        //C_MULDIV4(scratch[2],Fout[m3] , *tw3 );
+
         C_SUB( scratch[5] , *Fout, scratch[1] );
+        C_SUB( scratch[4] , scratch[0] , scratch[2] );
+
         C_ADDTO(*Fout, scratch[1]);
         C_ADD( scratch[3] , scratch[0] , scratch[2] );
-        C_SUB( scratch[4] , scratch[0] , scratch[2] );
         C_SUB( Fout[m2], *Fout, scratch[3] );
         C_ADDTO( *Fout , scratch[3] );
         // Replace C_MUL, C_SUB, C_ADDTO with Inline Assembly in _kiss_fft_guts.h

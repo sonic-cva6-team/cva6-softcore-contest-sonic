@@ -85,13 +85,13 @@ package cvxif_instr_pkg;
           32'b00000_00_00000_00000_1_11_00000_1111011,
           mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
           resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
-          opcode: C_FIXDIV
+          opcode: C_FIXDIV4
       },
       '{
           // Butterfly Radix-2 ADD: rd = rs1/2 + rs2/2
           // Optimized for identity twiddle (32767, 0) - no multiplication needed
           instr:
-          32'b00001_00_00000_00000_0_00_00000_1111011,
+          32'b00000_00_00000_00000_0_01_00000_1011011,
           mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
           resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
           opcode: BUTTERFLY_R2_ADD
@@ -100,7 +100,7 @@ package cvxif_instr_pkg;
           // Butterfly Radix-2 SUB: rd = rs1/2 - rs2/2
           // Optimized for identity twiddle (32767, 0) - no multiplication needed
           instr:
-          32'b00010_00_00000_00000_0_00_00000_1111011,
+          32'b00000_00_00000_00000_0_00_00010_1011011,
           mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
           resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
           opcode: BUTTERFLY_R2_SUB
