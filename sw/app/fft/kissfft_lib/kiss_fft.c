@@ -20,16 +20,15 @@ static void kf_bfly2(
 {
     kiss_fft_cpx * Fout2;
     kiss_fft_cpx tmp;
+    kiss_fft_cpx * tw1 = st->twiddles;
     Fout2 = Fout + m;
     do{   
-        /* Optimized radix-2 butterfly for identity twiddle (32767, 0)
-         * No multiplication needed - just divide by 2 and add/subtract
-         */
-        tmp = *Fout2;
-        BUTTERFLY_R2_SUB(*Fout2, *Fout, tmp); 
-        BUTTERFLY_R2_ADD(*Fout, *Fout, tmp);
-        
-      
+
+        C_MULDIV2(tmp, *Fout2, *tw1);
+        BFLY2_SUB(*Fout2, *Fout, tmp); 
+        BFLY2_ADD(*Fout, *Fout, tmp);
+             
+        tw1 += fstride;
         ++Fout2;                       
         ++Fout;                         
     }while (--m);
@@ -43,7 +42,6 @@ static void kf_bfly4(
         )
 {
     kiss_fft_cpx *tw1,*tw2,*tw3;
-    kiss_fft_cpx scratch[6];
     size_t k=m;
     const size_t m2=2*m;
     const size_t m3=3*m;
@@ -51,45 +49,37 @@ static void kf_bfly4(
 
     tw3 = tw2 = tw1 = st->twiddles;
 
-    do {
-        C_FIXDIV4(*Fout,4); 
-        
-        //C_FIXDIV4(Fout[m],4); 
-        //C_FIXDIV4(Fout[m2],4); 
-        //C_FIXDIV4(Fout[m3],4);
-        //C_MUL(scratch[0],Fout[m] , *tw1 );
-        //C_MUL(scratch[1],Fout[m2] , *tw2 );
-        //C_MUL(scratch[2],Fout[m3] , *tw3 );
+    if(st->inverse) {
+        do {
+            BFLY4_LD01(*Fout, Fout[m]);
+            BFLY4_LD23(Fout[m2], Fout[m3]);
+            BFLY4_TW(*tw1, *tw2);
+            BFLY4_EXEC_INV(*Fout, *tw3);
+            BFLY4_RD(Fout[m]);
+            BFLY4_RD(Fout[m2]);
+            BFLY4_RD(Fout[m3]);
 
-        C_MULDIV4(scratch[0],Fout[m] , *tw1 );
-        C_MULDIV4(scratch[1],Fout[m2] , *tw2 );
-        C_MULDIV4(scratch[2],Fout[m3] , *tw3 );
-        C_FIXDIV4(Fout[m2],4); 
+            tw1 += fstride;
+            tw2 += fstride*2;
+            tw3 += fstride*3;
+            ++Fout;
+        }while(--k);
+    } else {
+        do {
+            BFLY4_LD01(*Fout, Fout[m]);
+            BFLY4_LD23(Fout[m2], Fout[m3]);
+            BFLY4_TW(*tw1, *tw2);
+            BFLY4_EXEC_FWD(*Fout, *tw3);
+            BFLY4_RD(Fout[m]);
+            BFLY4_RD(Fout[m2]);
+            BFLY4_RD(Fout[m3]);
 
-        C_SUB( scratch[5] , *Fout, scratch[1] );
-        C_SUB( scratch[4] , scratch[0] , scratch[2] );
-
-        C_ADDTO(*Fout, scratch[1]);
-        C_ADD( scratch[3] , scratch[0] , scratch[2] );
-        C_SUB( Fout[m2], *Fout, scratch[3] );
-        C_ADDTO( *Fout , scratch[3] );
-        // Replace C_MUL, C_SUB, C_ADDTO with Inline Assembly in _kiss_fft_guts.h
-
-        tw1 += fstride;
-        tw2 += fstride*2;
-        tw3 += fstride*3;
-        
-        if(st->inverse) {           
-            
-            CPLX_ROT_INVERSE(Fout[m], Fout[m3], scratch[5], scratch[4]);
-            // Replace with CPLX_ROT_INVERSE(Fout[m], scratch[5], scratch[4]);
-        }else{           
-            
-            CPLX_ROT_FORWARD(Fout[m], Fout[m3], scratch[5], scratch[4]);
-            // Replace with CPLX_ROT_FORWARD(Fout[m], scratch[5], scratch[4]);
-        }
-        ++Fout;
-    }while(--k);
+            tw1 += fstride;
+            tw2 += fstride*2;
+            tw3 += fstride*3;
+            ++Fout;
+        }while(--k);
+    }
 }
 
 static void kf_bfly3(

@@ -142,19 +142,70 @@ struct kiss_fft_state
 // Simplified Radix-2 Butterfly Instructions
 // Optimized for identity twiddle factors (32767, 0) - no multiplication needed!
 // These combine FIXDIV by 2 (right shift) with ADD/SUB in single instructions
-#define BUTTERFLY_R2_ADD(res, a, b)              \
+#define BFLY2_ADD(res, a, b)                     \
     asm volatile(                                \
         ".insn r 0x5B, 1, 0, %0, %1, %2"         \
         : "=r"(*(uint32_t *)&(res))              \
         : "r"(*(uint32_t *)&(a)),                \
           "r"(*(uint32_t *)&(b)));                
 
-#define BUTTERFLY_R2_SUB(res, a, b)              \
+#define BFLY2_SUB(res, a, b)                     \
     asm volatile(                                \
         ".insn r 0x5B, 2, 0, %0, %1, %2"         \
         : "=r"(*(uint32_t *)&(res))              \
         : "r"(*(uint32_t *)&(a)),                \
           "r"(*(uint32_t *)&(b)));                
+
+#define C_MULDIV2(res, a, b)                     \
+    asm volatile(                                \
+        ".insn r 0x5B, 3, 0, %0, %1, %2"         \
+        : "=r"(*(uint32_t *)&(res))              \
+        : "r"(*(uint32_t *)&(a)),                \
+          "r"(*(uint32_t *)&(b)));                
+
+// ==================== BFLY4 Full Butterfly Instructions ====================
+// Opcode 0x2B (custom-1). Computes the entire radix-4 butterfly in hardware.
+// Sequence: LD01 → LD23 → TW → EXEC_FWD/INV → RD × 3
+
+#define BFLY4_LD01(f0, fm)                           \
+    asm volatile(                                    \
+        ".insn r 0x2B, 0, 0, x0, %0, %1"             \
+        : /* no outputs */                           \
+        : "r"(*(uint32_t *)&(f0)),                   \
+          "r"(*(uint32_t *)&(fm)));
+
+#define BFLY4_LD23(fm2, fm3)                         \
+    asm volatile(                                    \
+        ".insn r 0x2B, 1, 0, x0, %0, %1"             \
+        : /* no outputs */                           \
+        : "r"(*(uint32_t *)&(fm2)),                  \
+          "r"(*(uint32_t *)&(fm3)));
+
+#define BFLY4_TW(tw1, tw2)                           \
+    asm volatile(                                    \
+        ".insn r 0x2B, 2, 0, x0, %0, %1"             \
+        : /* no outputs */                           \
+        : "r"(*(uint32_t *)&(tw1)),                  \
+          "r"(*(uint32_t *)&(tw2)));
+
+#define BFLY4_EXEC_FWD(res, tw3)                     \
+    asm volatile(                                    \
+        ".insn r 0x2B, 3, 0, %0, %1, x0"             \
+        : "=r"(*(uint32_t *)&(res))                  \
+        : "r"(*(uint32_t *)&(tw3)));
+
+#define BFLY4_EXEC_INV(res, tw3)                     \
+    asm volatile(                                    \
+        ".insn r 0x2B, 4, 0, %0, %1, x0"             \
+        : "=r"(*(uint32_t *)&(res))                  \
+        : "r"(*(uint32_t *)&(tw3)));
+
+#define BFLY4_RD(res)                                \
+    asm volatile(                                    \
+        ".insn r 0x2B, 5, 0, %0, x0, x0"             \
+        : "=r"(*(uint32_t *)&(res)));
+
+// ================================
 
 #define CPLX_ROT_INVERSE(out1, out2, s5, s4) \
     do                                       \

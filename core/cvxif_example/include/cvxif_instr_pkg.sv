@@ -8,8 +8,15 @@ package cvxif_instr_pkg;
     C_ADD_ROT = 4'b0100,
     C_SUB_ROT = 4'b0101,
     C_FIXDIV4 = 4'b0110,
-    BUTTERFLY_R2_ADD = 4'b0111,
-    BUTTERFLY_R2_SUB = 4'b1000
+    BFLY2_ADD = 4'b0111,
+    BFLY2_SUB = 4'b1000,
+    BFLY4_LD01     = 4'b1001,
+    BFLY4_LD23     = 4'b1010,
+    BFLY4_TW       = 4'b1011,
+    BFLY4_EXEC_FWD = 4'b1100,
+    BFLY4_EXEC_INV = 4'b1101,
+    BFLY4_RD       = 4'b1110,
+    C_MULDIV2      = 4'b1111
 
   } opcode_t;
 
@@ -37,7 +44,7 @@ package cvxif_instr_pkg;
     compressed_resp_t resp;
   } copro_compressed_resp_t;
 
-  parameter int unsigned NbInstr = 8;
+  parameter int unsigned NbInstr = 15;
   parameter copro_issue_resp_t CoproInstr[NbInstr] = '{
       '{
           // Complex ADD (funct3=1)
@@ -94,7 +101,7 @@ package cvxif_instr_pkg;
           32'b00000_00_00000_00000_0_01_00000_1011011,
           mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
           resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
-          opcode: BUTTERFLY_R2_ADD
+          opcode: BFLY2_ADD
       },
       '{
           // Butterfly Radix-2 SUB: rd = rs1/2 - rs2/2
@@ -103,7 +110,63 @@ package cvxif_instr_pkg;
           32'b00000_00_00000_00000_0_10_00000_1011011,
           mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
           resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
-          opcode: BUTTERFLY_R2_SUB
+          opcode: BFLY2_SUB
+      },
+      '{
+          instr:
+          32'b00000_00_00000_00000_0_11_00000_1011011,
+          mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
+          resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
+          opcode: C_MULDIV2
+      },
+      // === BFLY4 Full Butterfly Instructions (opcode 0x2B = custom-1) ===
+      '{
+          // BFLY4_LD01: Load Fout[0] (rs1) and Fout[m] (rs2) into internal regs (funct3=0)
+          instr:
+          32'b00000_00_00000_00000_0_00_00000_0101011,
+          mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
+          resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
+          opcode: BFLY4_LD01
+      },
+      '{
+          // BFLY4_LD23: Load Fout[m2] (rs1) and Fout[m3] (rs2) into internal regs (funct3=1)
+          instr:
+          32'b00000_00_00000_00000_0_01_00000_0101011,
+          mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
+          resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
+          opcode: BFLY4_LD23
+      },
+      '{
+          // BFLY4_TW: Load tw1 (rs1) and tw2 (rs2) into internal regs (funct3=2)
+          instr:
+          32'b00000_00_00000_00000_0_10_00000_0101011,
+          mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
+          resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b1, 1'b1}},
+          opcode: BFLY4_TW
+      },
+      '{
+          // BFLY4_EXEC_FWD: Load tw3 (rs1), compute forward butterfly, rd=out[0] (funct3=3)
+          instr:
+          32'b00000_00_00000_00000_0_11_00000_0101011,
+          mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
+          resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b0, 1'b1}},
+          opcode: BFLY4_EXEC_FWD
+      },
+      '{
+          // BFLY4_EXEC_INV: Load tw3 (rs1), compute inverse butterfly, rd=out[0] (funct3=4)
+          instr:
+          32'b00000_00_00000_00000_1_00_00000_0101011,
+          mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
+          resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b0, 1'b1}},
+          opcode: BFLY4_EXEC_INV
+      },
+      '{
+          // BFLY4_RD: Read next butterfly result, auto-advancing (funct3=5)
+          instr:
+          32'b00000_00_00000_00000_1_01_00000_0101011,
+          mask: 32'b11111_11_00000_00000_1_11_00000_1111111,
+          resp: '{accept : 1'b1, writeback : 1'b1, register_read : {1'b0, 1'b0, 1'b0}},
+          opcode: BFLY4_RD
       }
 
   };
